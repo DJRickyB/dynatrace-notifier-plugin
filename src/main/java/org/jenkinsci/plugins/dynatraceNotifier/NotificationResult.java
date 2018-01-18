@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jenkinsci.plugins.stashNotifier;
+package org.jenkinsci.plugins.dynatraceNotifier;
 
 /**
  * convenience class to capture the result of a notification.

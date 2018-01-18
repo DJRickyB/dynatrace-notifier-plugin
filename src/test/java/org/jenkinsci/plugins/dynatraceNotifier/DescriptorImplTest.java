@@ -1,4 +1,4 @@
-package org.jenkinsci.plugins.stashNotifier;
+package org.jenkinsci.plugins.dynatraceNotifier;
 
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
@@ -38,13 +38,13 @@ import static org.mockito.Mockito.*;
  */
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({StashNotifier.DescriptorImpl.class, CredentialsProvider.class, Jenkins.class})
+@PrepareForTest({DynatraceNotifier.DescriptorImpl.class, CredentialsProvider.class, Jenkins.class})
 public class DescriptorImplTest {
 
     /**
      * Class under test.
      */
-    private StashNotifier.DescriptorImpl desc;
+    private DynatraceNotifier.DescriptorImpl desc;
 
     private JSONObject json;
     private Hudson jenkins;
@@ -57,7 +57,7 @@ public class DescriptorImplTest {
         when(Jenkins.getInstance()).thenReturn(jenkins);
 
         json = new JSONObject();
-        json.put("stashRootUrl", "http://stash-root-url");
+        json.put("dynatraceRootUrl", "http://dynatrace-root-url");
         json.put("credentialsId", "someCredentialsId");
         json.put("projectKey", "someProjectKey");
         json.put("ignoreUnverifiedSsl", "true");
@@ -66,7 +66,7 @@ public class DescriptorImplTest {
         json.put("disableInprogressNotification", "true");
         json.put("considerUnstableAsSuccess", "true");
 
-        desc = spy(new StashNotifier.DescriptorImpl(false));
+        desc = spy(new DynatraceNotifier.DescriptorImpl(false));
     }
 
     @Test
@@ -78,10 +78,10 @@ public class DescriptorImplTest {
         desc.configure(mock(StaplerRequest.class), json);
 
         //then
-        assertThat(desc.getStashRootUrl(), is("http://stash-root-url"));
+        assertThat(desc.getDynatraceRootUrl(), is("http://dynatrace-root-url"));
         assertThat(desc.getCredentialsId(), is("someCredentialsId"));
         assertThat(desc.getProjectKey(), is("someProjectKey"));
-        assertThat(desc.getDisplayName(), is("Notify Stash Instance"));
+        assertThat(desc.getDisplayName(), is("Notify Dynatrace Instance"));
         assertThat(desc.isDisableInprogressNotification(), is(true));
         assertThat(desc.isConsiderUnstableAsSuccess(), is(true));
         assertThat(desc.isIgnoreUnverifiedSsl(), is(true));
@@ -128,7 +128,7 @@ public class DescriptorImplTest {
         assertThat(listBoxModel, is(not(nullValue())));
     }
 
-    private FormValidation doCheckStashServerBaseUrl(String url) throws IOException, ServletException {
+    private FormValidation doCheckDynatraceServerBaseUrl(String url) throws IOException, ServletException {
         //given
         Item project = mock(Item.class);
         when(project.hasPermission(eq(Item.CONFIGURE))).thenReturn(true);
@@ -139,18 +139,18 @@ public class DescriptorImplTest {
                 Mockito.<Authentication>anyObject(),
                 Mockito.<List<DomainRequirement>>anyObject())).thenReturn(new ArrayList());
 
-        return desc.doCheckStashServerBaseUrl(url);
+        return desc.doCheckDynatraceServerBaseUrl(url);
     }
 
     @Test
-    public void test_doCheckStashServerBaseUrl_empty() throws IOException, ServletException {
-        FormValidation listBoxModel = doCheckStashServerBaseUrl("");
+    public void test_doCheckDynatraceServerBaseUrl_empty() throws IOException, ServletException {
+        FormValidation listBoxModel = doCheckDynatraceServerBaseUrl("");
         assertThat(listBoxModel.kind, is(FormValidation.Kind.ERROR));
     }
 
     @Test
-    public void test_doCheckStashServerBaseUrl() throws IOException, ServletException {
-        FormValidation listBoxModel = doCheckStashServerBaseUrl("http://some-stash-url");
+    public void test_doCheckDynatraceServerBaseUrl() throws IOException, ServletException {
+        FormValidation listBoxModel = doCheckDynatraceServerBaseUrl("http://some-dynatrace-url");
         assertThat(listBoxModel.kind, is(FormValidation.Kind.OK));
     }
 }

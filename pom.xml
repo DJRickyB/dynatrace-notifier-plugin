@@ -21,19 +21,19 @@
         -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-    <artifactId>stashNotifier</artifactId>
+    <artifactId>dynatraceNotifier</artifactId>
     <version>1.14-SNAPSHOT</version>
-    <name>Stash Notifier</name>
+    <name>Dynatrace Notifier</name>
     <description>
-        Jenkins plugin to notify Atlassian Stash (Bitbucket) git repository servers of
-        build results through the Stash build API.
+        Jenkins plugin to notify  Dynatrace (Dynatrace) git repository servers of
+        build results through the Dynatrace build API.
     </description>
-    <url>https://wiki.jenkins-ci.org/display/JENKINS/Bitbucket+(Stash)+Notifier+Plugin</url>
+    <url>https://wiki.jenkins-ci.org/display/JENKINS/Dynatrace+(Dynatrace)+Notifier+Plugin</url>
 
     <scm>
-        <connection>scm:git:https://github.com/jenkinsci/stashnotifier-plugin.git</connection>
-        <developerConnection>scm:git:https://github.com/jenkinsci/stashnotifier-plugin.git</developerConnection>
-        <url>https://github.com/jenkinsci/stashnotifier-plugin</url>
+        <connection>scm:git:https://github.com/jenkinsci/dynatracenotifier-plugin.git</connection>
+        <developerConnection>scm:git:https://github.com/jenkinsci/dynatracenotifier-plugin.git</developerConnection>
+        <url>https://github.com/jenkinsci/dynatracenotifier-plugin</url>
       <tag>HEAD</tag>
   </scm>
 

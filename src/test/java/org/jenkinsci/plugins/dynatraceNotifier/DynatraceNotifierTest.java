@@ -1,4 +1,4 @@
-package org.jenkinsci.plugins.stashNotifier;
+package org.jenkinsci.plugins.dynatraceNotifier;
 
 import com.cloudbees.plugins.credentials.Credentials;
 import com.cloudbees.plugins.credentials.CredentialsMatcher;
@@ -63,21 +63,21 @@ import static org.mockito.Mockito.*;
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({Secret.class, Jenkins.class, HttpClientBuilder.class, TokenMacro.class, CredentialsMatchers.class, com.cloudbees.plugins.credentials.CredentialsProvider.class, AbstractProject.class})
 @PowerMockIgnore("javax.net.ssl.*")
-public class StashNotifierTest {
+public class DynatraceNotifierTest {
     final static String sha1 = "1234567890123456789012345678901234567890";
     private HttpClientBuilder httpClientBuilder;
     private CloseableHttpClient client;
     private Hudson jenkins;
 
-    public StashNotifier buildStashNotifier(String stashBaseUrl) {
-        return buildStashNotifier(stashBaseUrl, false, false);
+    public DynatraceNotifier buildDynatraceNotifier(String dynatraceBaseUrl) {
+        return buildDynatraceNotifier(dynatraceBaseUrl, false, false);
     }
 
-    public StashNotifier buildStashNotifier(String stashBaseUrl,
+    public DynatraceNotifier buildDynatraceNotifier(String dynatraceBaseUrl,
                                             boolean disableInprogressNotification,
                                             boolean considerUnstableAsSuccess) {
-        return new StashNotifier(
-                stashBaseUrl,
+        return new DynatraceNotifier(
+                dynatraceBaseUrl,
                 "scot",
                 true,
                 null,
@@ -88,7 +88,7 @@ public class StashNotifierTest {
                 considerUnstableAsSuccess);
     }
 
-    StashNotifier sn;
+    DynatraceNotifier sn;
     BuildListener buildListener;
     AbstractBuild<?, ?> build;
     Run<?, ?> run;
@@ -161,7 +161,7 @@ public class StashNotifierTest {
                 (List<DomainRequirement>) anyList()
         )).thenReturn(new ArrayList<Credentials>());
 
-        sn = buildStashNotifier("http://localhost");
+        sn = buildDynatraceNotifier("http://localhost");
     }
 
     @Test
@@ -178,7 +178,7 @@ public class StashNotifierTest {
     @Test
     public void test_build_http_client_with_proxy() throws Exception {
         //given
-        StashNotifier sn = spy(this.sn);
+        DynatraceNotifier sn = spy(this.sn);
         doReturn(new ArrayList<Credentials>()).when(sn).lookupCredentials(
                 Mockito.<Class>anyObject(),
                 Mockito.<Item>anyObject(),
@@ -226,7 +226,7 @@ public class StashNotifierTest {
     @Test
     public void test_build_http_client_https() throws Exception {
         //given
-        sn = spy(new StashNotifier(
+        sn = spy(new DynatraceNotifier(
                 "https://localhost",
                 "scot",
                 true,
@@ -286,12 +286,12 @@ public class StashNotifierTest {
         Launcher launcher = mock(Launcher.class);
         sn = spy(sn);
         doReturn(hashes).when(sn).lookupCommitSha1s(eq(build), eq((FilePath) null), eq(buildListener));
-        doReturn(notificationResult).when(sn).notifyStash(
+        doReturn(notificationResult).when(sn).notifyDynatrace(
                 any(PrintStream.class),
                 any(AbstractBuild.class),
                 eq(sha1),
                 eq(buildListener),
-                any(StashBuildState.class)
+                any(DynatraceBuildState.class)
         );
         return launcher;
     }
@@ -309,13 +309,13 @@ public class StashNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Notified Stash for commit with id")));
+        assertThat(messageCaptor.getValue(), is(containsString("Notified Dynatrace for commit with id")));
     }
 
     @Test
     public void test_perform_build_step_success_for_unstable_build() throws Exception {
         //given
-        sn = buildStashNotifier("http://localhost", false, true);
+        sn = buildDynatraceNotifier("http://localhost", false, true);
         ArrayList<String> hashes = new ArrayList<String>();
         hashes.add(sha1);
         PrintStream logger = mock(PrintStream.class);
@@ -327,14 +327,14 @@ public class StashNotifierTest {
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger, atLeastOnce()).println(messageCaptor.capture());
         List<String> values = messageCaptor.getAllValues();
-        assertThat(values.get(0), is(containsString("UNSTABLE reported to stash as SUCCESSFUL")));
-        assertThat(values.get(1), is(containsString("Notified Stash for commit with id")));
+        assertThat(values.get(0), is(containsString("UNSTABLE reported to Dynatrace as SUCCESSFUL")));
+        assertThat(values.get(1), is(containsString("Notified Dynatrace for commit with id")));
     }
 
     @Test
-    public void test_perform_build_step_aborted_without_notifying_stash() throws Exception {
+    public void test_perform_build_step_aborted_without_notifying_dynatrace() throws Exception {
         //given
-        sn = buildStashNotifier("http://localhost", true, true);
+        sn = buildDynatraceNotifier("http://localhost", true, true);
         ArrayList<String> hashes = new ArrayList<String>();
         hashes.add(sha1);
         PrintStream logger = mock(PrintStream.class);
@@ -361,7 +361,7 @@ public class StashNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Stash for commit")));
+        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Dynatrace for commit")));
     }
 
     @Test
@@ -394,12 +394,12 @@ public class StashNotifierTest {
 
         //then
         assertThat(perform, is(true));
-        verify(sn, never()).notifyStash(
+        verify(sn, never()).notifyDynatrace(
                 any(PrintStream.class),
                 any(AbstractBuild.class),
                 anyString(),
                 eq(buildListener),
-                any(StashBuildState.class)
+                any(DynatraceBuildState.class)
         );
         verify(logger).println("found no commit info");
     }
@@ -417,7 +417,7 @@ public class StashNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Notified Stash for commit with id")));
+        assertThat(messageCaptor.getValue(), is(containsString("Notified Dynatrace for commit with id")));
     }
 
 
@@ -434,7 +434,7 @@ public class StashNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Stash for commit")));
+        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Dynatrace for commit")));
     }
 
     @Test
@@ -466,12 +466,12 @@ public class StashNotifierTest {
         sn.perform(build, workspace, mock(Launcher.class), buildListener);
 
         //then
-        verify(sn, never()).notifyStash(
+        verify(sn, never()).notifyDynatrace(
                 any(PrintStream.class),
                 any(AbstractBuild.class),
                 anyString(),
                 eq(buildListener),
-                any(StashBuildState.class)
+                any(DynatraceBuildState.class)
         );
         verify(logger).println("found no commit info");
     }
@@ -480,7 +480,7 @@ public class StashNotifierTest {
     public void lookupCommitSha1s() throws InterruptedException, MacroEvaluationException, IOException {
         PowerMockito.mockStatic(TokenMacro.class);
         PowerMockito.when(TokenMacro.expandAll(build, buildListener, sha1)).thenReturn(sha1);
-        sn = new StashNotifier(
+        sn = new DynatraceNotifier(
                 "https://localhost",
                 "scot",
                 true,
@@ -504,7 +504,7 @@ public class StashNotifierTest {
         when(buildListener.getLogger()).thenReturn(logger);
         PowerMockito.mockStatic(TokenMacro.class);
         PowerMockito.when(TokenMacro.expandAll(build, buildListener, sha1)).thenThrow(e);
-        sn = new StashNotifier(
+        sn = new DynatraceNotifier(
                 "http://localhost",
                 "scot",
                 true,
@@ -545,27 +545,27 @@ public class StashNotifierTest {
         when(build.getDescription()).thenReturn("some description");
 
         //when
-        String description = sn.getBuildDescription(build, StashBuildState.FAILED);
+        String description = sn.getBuildDescription(build, DynatraceBuildState.FAILED);
 
         //then
         assertThat(description, is("some description"));
     }
 
-    private String getBuildDescriptionWhenBuildDescriptionIsNull(StashBuildState buildState) throws InterruptedException, MacroEvaluationException, IOException {
+    private String getBuildDescriptionWhenBuildDescriptionIsNull(DynatraceBuildState buildState) throws InterruptedException, MacroEvaluationException, IOException {
         return sn.getBuildDescription(mock(AbstractBuild.class), buildState);
     }
 
     @Test
     public void test_getBuildDescription_state() throws InterruptedException, MacroEvaluationException, IOException {
-        assertThat(getBuildDescriptionWhenBuildDescriptionIsNull(StashBuildState.SUCCESSFUL), is("built by Jenkins @ http://localhost/"));
-        assertThat(getBuildDescriptionWhenBuildDescriptionIsNull(StashBuildState.FAILED), is("built by Jenkins @ http://localhost/"));
-        assertThat(getBuildDescriptionWhenBuildDescriptionIsNull(StashBuildState.INPROGRESS), is("building on Jenkins @ http://localhost/"));
+        assertThat(getBuildDescriptionWhenBuildDescriptionIsNull(DynatraceBuildState.SUCCESSFUL), is("built by Jenkins @ http://localhost/"));
+        assertThat(getBuildDescriptionWhenBuildDescriptionIsNull(DynatraceBuildState.FAILED), is("built by Jenkins @ http://localhost/"));
+        assertThat(getBuildDescriptionWhenBuildDescriptionIsNull(DynatraceBuildState.INPROGRESS), is("building on Jenkins @ http://localhost/"));
     }
 
     @Test
     public void test_createRequest() throws AuthenticationException {
         //given
-        StashNotifier sn = spy(this.sn);
+        DynatraceNotifier sn = spy(this.sn);
         ArrayList<Credentials> credentialList = new ArrayList<Credentials>();
         UsernamePasswordCredentialsImpl credential = new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "", "", "admin", "tiger");
         credentialList.add(credential);
@@ -594,7 +594,7 @@ public class StashNotifierTest {
         PowerMockito.mockStatic(TokenMacro.class);
         PowerMockito.when(TokenMacro.expandAll(build, buildListener, key)).thenReturn(key);
 
-        sn = new StashNotifier(
+        sn = new DynatraceNotifier(
                 "",
                 "scot",
                 true,
@@ -616,12 +616,12 @@ public class StashNotifierTest {
         String key = "someKey";
         PrintStream logger = mock(PrintStream.class);
         when(buildListener.getLogger()).thenReturn(logger);
-        final File tempDir = File.createTempFile("stashNotifier", null);
+        final File tempDir = File.createTempFile("dynatraceNotifier", null);
         when(run.getRootDir()).thenReturn(tempDir);
         PowerMockito.mockStatic(TokenMacro.class);
         PowerMockito.when(TokenMacro.expandAll(run, new FilePath(tempDir), buildListener, key)).thenReturn(key);
 
-        sn = new StashNotifier(
+        sn = new DynatraceNotifier(
                 "",
                 "scot",
                 true,
@@ -645,7 +645,7 @@ public class StashNotifierTest {
         PowerMockito.mockStatic(TokenMacro.class);
         PowerMockito.when(TokenMacro.expandAll(build, buildListener, key)).thenThrow(e);
 
-        sn = new StashNotifier(
+        sn = new DynatraceNotifier(
                 "",
                 "scot",
                 true,
@@ -669,12 +669,12 @@ public class StashNotifierTest {
         String key = "someKey";
         PrintStream logger = mock(PrintStream.class);
         when(buildListener.getLogger()).thenReturn(logger);
-        final File tempDir = File.createTempFile("stashNotifier", null);
+        final File tempDir = File.createTempFile("dynatraceNotifier", null);
         when(run.getRootDir()).thenReturn(tempDir);
         PowerMockito.mockStatic(TokenMacro.class);
         PowerMockito.when(TokenMacro.expandAll(run, new FilePath(tempDir), buildListener, key)).thenThrow(e);
 
-        sn = new StashNotifier(
+        sn = new DynatraceNotifier(
                 "",
                 "scot",
                 true,
@@ -723,7 +723,7 @@ public class StashNotifierTest {
         getRunKey_Exception(new MacroEvaluationException("BOOM"));
     }
 
-    private NotificationResult notifyStash(int statusCode) throws Exception {
+    private NotificationResult notifyDynatrace(int statusCode) throws Exception {
         sn = spy(this.sn);
         PrintStream logger = mock(PrintStream.class);
         when(buildListener.getLogger()).thenReturn(logger);
@@ -737,18 +737,18 @@ public class StashNotifierTest {
         when(resp.getEntity()).thenReturn(new StringEntity(""));
         when(client.execute(eq(httpPost))).thenReturn(resp);
         doReturn(client).when(sn).getHttpClient(any(PrintStream.class), any(AbstractBuild.class), anyString());
-        return sn.notifyStash(logger, build, sha1, buildListener, StashBuildState.FAILED);
+        return sn.notifyDynatrace(logger, build, sha1, buildListener, DynatraceBuildState.FAILED);
     }
 
     @Test
-    public void notifyStash_success() throws Exception {
-        NotificationResult notificationResult = notifyStash(204);
+    public void notifyDynatrace_success() throws Exception {
+        NotificationResult notificationResult = notifyDynatrace(204);
         assertThat(notificationResult.indicatesSuccess, is(true));
     }
 
     @Test
-    public void notifyStash_fail() throws Exception {
-        NotificationResult notificationResult = notifyStash(400);
+    public void notifyDynatrace_fail() throws Exception {
+        NotificationResult notificationResult = notifyDynatrace(400);
         assertThat(notificationResult.indicatesSuccess, is(false));
     }
 }

@@ -12,8 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * Original Code has been re-purposed as of 2017 by Rick Boyd
  */
-package org.jenkinsci.plugins.stashNotifier;
+package org.jenkinsci.plugins.dynatraceNotifier;
 
 import com.cloudbees.plugins.credentials.Credentials;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
@@ -94,12 +96,12 @@ import java.security.cert.X509Certificate;
 import java.util.*;
 
 /**
- * Notifies a configured Atlassian Stash server instance of build results
- * through the Stash build API.
+ * Notifies a configured Dynatrace Managed server instance of build results
+ * through the Dynatrace build API.
  * <p>
  * Only basic authentication is supported at the moment.
  */
-public class StashNotifier extends Notifier implements SimpleBuildStep {
+public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
 
     public static final int MAX_FIELD_LENGTH = 255;
     public static final int MAX_URL_FIELD_LENGTH = 450;
@@ -107,9 +109,9 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     // attributes --------------------------------------------------------------
 
     /**
-     * base url of Stash server, e. g. <tt>http://localhost:7990</tt>.
+     * base url of Dynatrace server, e. g. <tt>http://localhost:7990</tt>.
      */
-    private final String stashServerBaseUrl;
+    private final String dynatraceServerBaseUrl;
 
     /**
      * The id of the credentials to use.
@@ -127,7 +129,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     private final String commitSha1;
 
     /**
-     * if true, the build number is included in the Stash notification.
+     * if true, the build number is included in the Dynatrace notification.
      */
     private final boolean includeBuildNumberInKey;
 
@@ -161,8 +163,8 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     }
 
     @DataBoundConstructor
-    public StashNotifier(
-            String stashServerBaseUrl,
+    public DynatraceNotifier(
+            String dynatraceServerBaseUrl,
             String credentialsId,
             boolean ignoreUnverifiedSSLPeer,
             String commitSha1,
@@ -174,9 +176,9 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     ) {
 
 
-        this.stashServerBaseUrl = stashServerBaseUrl != null && stashServerBaseUrl.endsWith("/")
-                ? stashServerBaseUrl.substring(0, stashServerBaseUrl.length() - 1)
-                : stashServerBaseUrl;
+        this.dynatraceServerBaseUrl = dynatraceServerBaseUrl != null && dynatraceServerBaseUrl.endsWith("/")
+                ? dynatraceServerBaseUrl.substring(0, dynatraceServerBaseUrl.length() - 1)
+                : dynatraceServerBaseUrl;
         this.credentialsId = credentialsId;
         this.ignoreUnverifiedSSLPeer = ignoreUnverifiedSSLPeer;
         this.commitSha1 = commitSha1;
@@ -199,8 +201,8 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
         return credentialsId;
     }
 
-    public String getStashServerBaseUrl() {
-        return stashServerBaseUrl;
+    public String getDynatraceServerBaseUrl() {
+        return dynatraceServerBaseUrl;
     }
 
     public boolean getIgnoreUnverifiedSSLPeer() {
@@ -225,7 +227,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
 
     @Override
     public boolean prebuild(AbstractBuild<?, ?> build, BuildListener listener) {
-        return disableInprogressNotification || processJenkinsEvent(build, null, listener, StashBuildState.INPROGRESS);
+        return disableInprogressNotification || processJenkinsEvent(build, null, listener, DynatraceBuildState.INPROGRESS);
     }
 
     @Override
@@ -250,7 +252,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
                             FilePath workspace,
                             TaskListener listener,
                             boolean disableInProgress) {
-        StashBuildState state;
+        DynatraceBuildState state;
 
         PrintStream logger = listener.getLogger();
 
@@ -258,12 +260,12 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
         if (buildResult == null && disableInProgress) {
             return true;
         } else if (buildResult == null) {
-            state = StashBuildState.INPROGRESS;
+            state = DynatraceBuildState.INPROGRESS;
         } else if (buildResult == Result.SUCCESS) {
-            state = StashBuildState.SUCCESSFUL;
+            state = DynatraceBuildState.SUCCESSFUL;
         } else if (buildResult == Result.UNSTABLE && considerUnstableAsSuccess) {
-            logger.println("UNSTABLE reported to stash as SUCCESSFUL");
-            state = StashBuildState.SUCCESSFUL;
+            logger.println("UNSTABLE reported to Dynatrace as SUCCESSFUL");
+            state = DynatraceBuildState.SUCCESSFUL;
         } else if (buildResult == Result.ABORTED && disableInProgress) {
             logger.println("ABORTED");
             return true;
@@ -271,7 +273,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
             logger.println("NOT BUILT");
             return true;
         } else {
-            state = StashBuildState.FAILED;
+            state = DynatraceBuildState.FAILED;
         }
 
         return processJenkinsEvent(run, null, listener, state);
@@ -294,9 +296,9 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
 
     /**
      * Processes the Jenkins events triggered before and after the run and
-     * initiates the Stash notification.
+     * initiates the Dynatrace notification.
      *
-     * @param run       the run to notify Stash of
+     * @param run       the run to notify Dynatrace of
      * @param workspace the workspace of a non-AbstractBuild build
      * @param listener  the Jenkins build listener
      * @param state     the state of the build (in progress, success, failed)
@@ -307,15 +309,15 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
             final Run<?, ?> run,
             final FilePath workspace,
             final TaskListener listener,
-            final StashBuildState state) {
+            final DynatraceBuildState state) {
 
         PrintStream logger = listener.getLogger();
 
-        // exit if Jenkins root URL is not configured. Stash run API
+        // exit if Jenkins root URL is not configured. Dynatrace run API
         // requires valid link to run in CI system.
         if (getRootUrl() == null) {
             logger.println(
-                    "Cannot notify Stash! (Jenkins Root URL not configured)");
+                    "Cannot notify Dynatrace! (Jenkins Root URL not configured)");
             return true;
         }
 
@@ -323,25 +325,25 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
         for (String commitSha1 : commitSha1s) {
             try {
                 NotificationResult result
-                        = notifyStash(logger, run, commitSha1, listener, state);
+                        = notifyDynatrace(logger, run, commitSha1, listener, state);
                 if (result.indicatesSuccess) {
                     logger.println(
-                            "Notified Stash for commit with id "
+                            "Notified Dynatrace for commit with id "
                                     + commitSha1);
                 } else {
                     logger.println(
-                            "Failed to notify Stash for commit "
+                            "Failed to notify Dynatrace for commit "
                                     + commitSha1
                                     + " (" + result.message + ")");
                 }
             } catch (SSLPeerUnverifiedException e) {
                 logger.println("SSLPeerUnverifiedException caught while "
-                        + "notifying Stash. Make sure your SSL certificate on "
-                        + "your Stash server is valid or check the "
+                        + "notifying Dynatrace. Make sure your SSL certificate on "
+                        + "your Dynatrace server is valid or check the "
                         + " 'Ignore unverifiable SSL certificate' checkbox in the "
-                        + "Stash plugin configuration of this job.");
+                        + "Dynatrace plugin configuration of this job.");
             } catch (Exception e) {
-                logger.println("Caught exception while notifying Stash with id "
+                logger.println("Caught exception while notifying Dynatrace with id "
                         + commitSha1);
                 e.printStackTrace(logger);
             }
@@ -415,15 +417,15 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
      *
      * @param logger      the logger to log messages to
      * @param run
-     * @param stashServer
+     * @param dynatraceServer
      * @return the HttpClient
      */
-    protected HttpClient getHttpClient(PrintStream logger, Run<?, ?> run, String stashServer) throws Exception {
+    protected HttpClient getHttpClient(PrintStream logger, Run<?, ?> run, String dynatraceServer) throws Exception {
         DescriptorImpl globalSettings = getDescriptor();
 
         CertificateCredentials certificateCredentials = getCredentials(CertificateCredentials.class, run.getParent());
 
-        URL url = new URL(stashServer);
+        URL url = new URL(dynatraceServer);
         HttpClientBuilder builder = HttpClientBuilder.create();
         RequestConfig.Builder requestBuilder = RequestConfig.custom();
         requestBuilder = requestBuilder.setSocketTimeout(60000);
@@ -545,7 +547,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
         return (DescriptorImpl) super.getDescriptor();
     }
 
-    @Symbol({"notifyBitbucket", "notifyStash"})
+    @Symbol({"notifyBitbucket", "notifyDynatrace"})
     @Extension
     public static final class DescriptorImpl
             extends BuildStepDescriptor<Publisher> {
@@ -559,7 +561,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
          */
 
         private String credentialsId;
-        private String stashRootUrl;
+        private String dynatraceRootUrl;
         private boolean ignoreUnverifiedSsl;
         private boolean includeBuildNumberInKey;
         private String projectKey;
@@ -582,7 +584,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
                 return new StandardListBoxModel()
                         .withEmptySelection()
                         .withMatching(
-                                new StashCredentialMatcher(),
+                                new DynatraceCredentialMatcher(),
                                 CredentialsProvider.lookupCredentials(
                                         StandardCredentials.class,
                                         project,
@@ -592,7 +594,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
                 return new StandardListBoxModel()
                         .withEmptySelection()
                         .withMatching(
-                                new StashCredentialMatcher(),
+                                new DynatraceCredentialMatcher(),
                                 CredentialsProvider.lookupCredentials(
                                         StandardCredentials.class,
                                         jenkins,
@@ -603,11 +605,11 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
             return new StandardListBoxModel();
         }
 
-        public String getStashRootUrl() {
-            if ((stashRootUrl == null) || (stashRootUrl.trim().isEmpty())) {
+        public String getDynatraceRootUrl() {
+            if ((dynatraceRootUrl == null) || (dynatraceRootUrl.trim().isEmpty())) {
                 return null;
             } else {
-                return stashRootUrl;
+                return dynatraceRootUrl;
             }
         }
 
@@ -650,7 +652,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
         }
 
 
-        public FormValidation doCheckStashServerBaseUrl(
+        public FormValidation doCheckDynatraceServerBaseUrl(
                 @QueryParameter String value)
                 throws IOException, ServletException {
 
@@ -659,7 +661,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
             if ((url != null) && (!url.trim().isEmpty())) {
                 url = url.trim();
             } else {
-                url = stashRootUrl != null ? stashRootUrl.trim() : null;
+                url = dynatraceRootUrl != null ? dynatraceRootUrl.trim() : null;
             }
 
             if ((url == null) || url.isEmpty()) {
@@ -686,7 +688,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
 
         @Override
         public String getDisplayName() {
-            return "Notify Stash Instance";
+            return "Notify Dynatrace Instance";
         }
 
         @Override
@@ -696,7 +698,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
 
             // to persist global configuration information,
             // set that to properties and call save().
-            stashRootUrl = formData.getString("stashRootUrl");
+            dynatraceRootUrl = formData.getString("dynatraceRootUrl");
             ignoreUnverifiedSsl = formData.getBoolean("ignoreUnverifiedSsl");
             includeBuildNumberInKey = formData.getBoolean("includeBuildNumberInKey");
 
@@ -720,30 +722,30 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     // non-public members ------------------------------------------------------
 
     /**
-     * Notifies the configured Stash server by POSTing the run results
-     * to the Stash run API.
+     * Notifies the configured Dynatrace server by POSTing the run results
+     * to the Dynatrace run API.
      *
      * @param logger     the logger to use
-     * @param run        the run to notify Stash of
+     * @param run        the run to notify Dynatrace of
      * @param commitSha1 the SHA1 of the run commit
      * @param listener   the run listener for logging
-     * @param state      the state of the build as defined by the Stash API.
+     * @param state      the state of the build as defined by the Dynatrace API.
      */
-    protected NotificationResult notifyStash(
+    protected NotificationResult notifyDynatrace(
             final PrintStream logger,
             final Run<?, ?> run,
             final String commitSha1,
             final TaskListener listener,
-            final StashBuildState state) throws Exception {
-        HttpEntity stashBuildNotificationEntity
-                = newStashBuildNotificationEntity(run, state, listener);
+            final DynatraceBuildState state) throws Exception {
+        HttpEntity dynatraceBuildNotificationEntity
+                = newDynatraceBuildNotificationEntity(run, state, listener);
 
-        String stashURL = expandStashURL(run, listener);
+        String dynatraceURL = expandDynatraceURL(run, listener);
 
-        logger.println("Notifying Stash at \"" + stashURL + "\"");
+        logger.println("Notifying Dynatrace at \"" + dynatraceURL + "\"");
 
-        HttpPost req = createRequest(stashBuildNotificationEntity, run.getParent(), commitSha1, stashURL);
-        HttpClient client = getHttpClient(logger, run, stashURL);
+        HttpPost req = createRequest(dynatraceBuildNotificationEntity, run.getParent(), commitSha1, dynatraceURL);
+        HttpClient client = getHttpClient(logger, run, dynatraceURL);
         try {
             HttpResponse res = client.execute(req);
             if (res.getStatusLine().getStatusCode() != 204) {
@@ -825,17 +827,17 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     }
 
     /**
-     * Returns the HTTP POST request ready to be sent to the Stash build API for
+     * Returns the HTTP POST request ready to be sent to the Dynatrace build API for
      * the given run and change set.
      *
-     * @param stashBuildNotificationEntity a entity containing the parameters
-     *                                     for Stash
+     * @param dynatraceBuildNotificationEntity a entity containing the parameters
+     *                                     for Dynatrace
      * @param commitSha1                   the SHA1 of the commit that was built
      * @param url
-     * @return the HTTP POST request to the Stash build API
+     * @return the HTTP POST request to the Dynatrace build API
      */
     protected HttpPost createRequest(
-            final HttpEntity stashBuildNotificationEntity,
+            final HttpEntity dynatraceBuildNotificationEntity,
             final Item project,
             final String commitSha1,
             final String url) throws AuthenticationException {
@@ -860,16 +862,16 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
         }
 
         req.addHeader("Content-type", "application/json");
-        req.setEntity(stashBuildNotificationEntity);
+        req.setEntity(dynatraceBuildNotificationEntity);
 
         return req;
     }
 
-    private String expandStashURL(Run<?, ?> run, final TaskListener listener) {
-        String url = stashServerBaseUrl;
+    private String expandDynatraceURL(Run<?, ?> run, final TaskListener listener) {
+        String url = dynatraceServerBaseUrl;
         DescriptorImpl descriptor = getDescriptor();
         if (url == null || url.isEmpty()) {
-            url = descriptor.getStashRootUrl();
+            url = descriptor.getDynatraceRootUrl();
         }
 
         try {
@@ -881,7 +883,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
 
         } catch (IOException | InterruptedException | MacroEvaluationException ex) {
             PrintStream logger = listener.getLogger();
-            logger.println("Unable to expand Stash Server URL");
+            logger.println("Unable to expand Dynatrace Server URL");
             ex.printStackTrace(logger);
         }
         return url;
@@ -889,14 +891,14 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
 
     /**
      * Returns the HTTP POST entity body with the JSON representation of the
-     * run result to be sent to the Stash build API.
+     * run result to be sent to the Dynatrace build API.
      *
-     * @param run the run to notify Stash of
-     * @return HTTP entity body for POST to Stash build API
+     * @param run the run to notify Dynatrace of
+     * @return HTTP entity body for POST to Dynatrace build API
      */
-    private HttpEntity newStashBuildNotificationEntity(
+    private HttpEntity newDynatraceBuildNotificationEntity(
             final Run<?, ?> run,
-            final StashBuildState state,
+            final DynatraceBuildState state,
             TaskListener listener) throws UnsupportedEncodingException {
 
         JSONObject json = new JSONObject();
@@ -929,7 +931,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     /**
      * Return the old-fashion build key
      *
-     * @param run the run to notify Stash of
+     * @param run the run to notify Dynatrace of
      * @return default build key
      */
     private String getDefaultBuildKey(final Run<?, ?> run) {
@@ -946,11 +948,11 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     }
 
     /**
-     * Returns the run key used in the Stash notification. Includes the
+     * Returns the run key used in the Dynatrace notification. Includes the
      * run number depending on the user setting.
      *
-     * @param run the run to notify Stash of
-     * @return the run key for the Stash notification
+     * @param run the run to notify Dynatrace of
+     * @return the run key for the Dynatrace notification
      */
     protected String getBuildKey(final Run<?, ?> run,
                                  TaskListener listener) {
@@ -993,7 +995,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
     }
 
     /**
-     * Returns the description of the run used for the Stash notification.
+     * Returns the description of the run used for the Dynatrace notification.
      * Uses the run description provided by the Jenkins job, if available.
      *
      * @param run   the run to be described
@@ -1002,7 +1004,7 @@ public class StashNotifier extends Notifier implements SimpleBuildStep {
      */
     protected String getBuildDescription(
             final Run<?, ?> run,
-            final StashBuildState state) {
+            final DynatraceBuildState state) {
 
         if (run.getDescription() != null
                 && run.getDescription().trim().length() > 0) {
