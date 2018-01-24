@@ -9,8 +9,8 @@
   <f:entry title="Dynatrace base URL" field="dynatraceServerBaseUrl">
     <f:textbox />
   </f:entry>
-   <f:entry title="${%Credentials}" field="credentialsId">
-      <c:select/>
+   <f:entry title="API Token" field="credentialsId">
+      <f:textbox />
     </f:entry>
    <f:entry title="Commit SHA-1" field="commitSha1">
     <f:textbox />

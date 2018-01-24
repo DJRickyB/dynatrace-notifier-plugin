@@ -21,7 +21,6 @@ import com.cloudbees.plugins.credentials.Credentials;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.*;
-import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 import hudson.Extension;
 import hudson.FilePath;
@@ -61,7 +60,6 @@ import org.apache.http.conn.ssl.SSLContextBuilder;
 import org.apache.http.conn.ssl.SSLContexts;
 import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.ProxyAuthenticationStrategy;
@@ -547,7 +545,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         return (DescriptorImpl) super.getDescriptor();
     }
 
-    @Symbol({"notifyBitbucket", "notifyDynatrace"})
+    @Symbol({"notifyDynatrace", "notifyDynatrace"})
     @Extension
     public static final class DescriptorImpl
             extends BuildStepDescriptor<Publisher> {
@@ -842,23 +840,11 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             final String commitSha1,
             final String url) throws AuthenticationException {
 
-        HttpPost req = new HttpPost(
-                url
-                        + "/rest/build-status/1.0/commits/"
-                        + commitSha1);
+        HttpPost req = new HttpPost(url);
 
-        // If we have a credential defined then we need to determine if it
-        // is a basic auth
-        UsernamePasswordCredentials usernamePasswordCredentials
-                = getCredentials(UsernamePasswordCredentials.class, project);
-
-        if (usernamePasswordCredentials != null) {
-            req.addHeader(new BasicScheme().authenticate(
-                    new org.apache.http.auth.UsernamePasswordCredentials(
-                            usernamePasswordCredentials.getUsername(),
-                            usernamePasswordCredentials.getPassword().getPlainText()),
-                    req,
-                    null));
+        if (credentialsId != null) {
+            req.addHeader("Authorization", "Api-Token " +
+                            credentialsId);
         }
 
         req.addHeader("Content-type", "application/json");
@@ -903,14 +889,12 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
 
         JSONObject json = new JSONObject();
 
-        json.put("state", state.name());
-
-        json.put("key", abbreviate(getBuildKey(run, listener), MAX_FIELD_LENGTH));
-
-        json.put("name", abbreviate(run.getFullDisplayName(), MAX_FIELD_LENGTH));
-
-        json.put("description", abbreviate(getBuildDescription(run, state), MAX_FIELD_LENGTH));
-        json.put("url", abbreviate(DisplayURLProvider.get().getRunURL(run), MAX_URL_FIELD_LENGTH));
+        json.put("eventType", "CUSTOM_DEPLOYMENT");
+        json.put("deploymentName", state.name() + " - " + abbreviate(run.getFullDisplayName(), MAX_FIELD_LENGTH) + " " + abbreviate(getBuildKey(run, listener), MAX_FIELD_LENGTH));
+        JSONObject props = new JSONObject();
+        props.put("description", abbreviate(getBuildDescription(run, state), MAX_FIELD_LENGTH));
+        json.put("customProperties", props);
+        json.put("ciBackLink", abbreviate(DisplayURLProvider.get().getRunURL(run), MAX_URL_FIELD_LENGTH));
 
         return new StringEntity(json.toString(), "UTF-8");
     }
