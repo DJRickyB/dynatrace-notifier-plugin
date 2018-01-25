@@ -39,6 +39,7 @@ import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import jenkins.model.JenkinsLocationConfiguration;
 import jenkins.tasks.SimpleBuildStep;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.acegisecurity.Authentication;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -122,9 +123,9 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
     private final boolean ignoreUnverifiedSSLPeer;
 
     /**
-     * specify the commit from config
+     * specify the entity from config
      */
-    private final String commitSha1;
+    private final String entityId;
 
     /**
      * if true, the build number is included in the Dynatrace notification.
@@ -165,7 +166,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             String dynatraceServerBaseUrl,
             String credentialsId,
             boolean ignoreUnverifiedSSLPeer,
-            String commitSha1,
+            String entityId,
             boolean includeBuildNumberInKey,
             String projectKey,
             boolean prependParentProjectKey,
@@ -179,7 +180,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
                 : dynatraceServerBaseUrl;
         this.credentialsId = credentialsId;
         this.ignoreUnverifiedSSLPeer = ignoreUnverifiedSSLPeer;
-        this.commitSha1 = commitSha1;
+        this.entityId = entityId;
         this.includeBuildNumberInKey = includeBuildNumberInKey;
         this.projectKey = projectKey;
         this.prependParentProjectKey = prependParentProjectKey;
@@ -207,8 +208,8 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         return ignoreUnverifiedSSLPeer;
     }
 
-    public String getCommitSha1() {
-        return commitSha1;
+    public String getentityId() {
+        return entityId;
     }
 
     public boolean getIncludeBuildNumberInKey() {
@@ -319,93 +320,28 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             return true;
         }
 
-        Collection<String> commitSha1s = lookupCommitSha1s(run, workspace, listener);
-        for (String commitSha1 : commitSha1s) {
-            try {
-                NotificationResult result
-                        = notifyDynatrace(logger, run, commitSha1, listener, state);
-                if (result.indicatesSuccess) {
-                    logger.println(
-                            "Notified Dynatrace for commit with id "
-                                    + commitSha1);
-                } else {
-                    logger.println(
-                            "Failed to notify Dynatrace for commit "
-                                    + commitSha1
-                                    + " (" + result.message + ")");
-                }
-            } catch (SSLPeerUnverifiedException e) {
-                logger.println("SSLPeerUnverifiedException caught while "
-                        + "notifying Dynatrace. Make sure your SSL certificate on "
-                        + "your Dynatrace server is valid or check the "
-                        + " 'Ignore unverifiable SSL certificate' checkbox in the "
-                        + "Dynatrace plugin configuration of this job.");
-            } catch (Exception e) {
-                logger.println("Caught exception while notifying Dynatrace with id "
-                        + commitSha1);
-                e.printStackTrace(logger);
+        try {
+            NotificationResult result
+                    = notifyDynatrace(logger, run, listener, state);
+            if (result.indicatesSuccess) {
+                logger.println(
+                        "Notified Dynatrace");
+            } else {
+                logger.println(
+                        "Failed to notify Dynatrace"
+                                + " (" + result.message + ")");
             }
-        }
-        if (commitSha1s.isEmpty()) {
-            logger.println("found no commit info");
+        } catch (SSLPeerUnverifiedException e) {
+            logger.println("SSLPeerUnverifiedException caught while "
+                    + "notifying Dynatrace. Make sure your SSL certificate on "
+                    + "your Dynatrace server is valid or check the "
+                    + " 'Ignore unverifiable SSL certificate' checkbox in the "
+                    + "Dynatrace plugin configuration of this job.");
+        } catch (Exception e) {
+            logger.println("Caught exception while notifying Dynatrace");
+            e.printStackTrace(logger);
         }
         return true;
-    }
-
-    protected Collection<String> lookupCommitSha1s(
-            @SuppressWarnings("rawtypes") Run run,
-            FilePath workspace,
-            TaskListener listener) {
-
-        if (commitSha1 != null && commitSha1.trim().length() > 0) {
-            PrintStream logger = listener.getLogger();
-
-            try {
-                if (run instanceof AbstractBuild) {
-                    return Arrays.asList(TokenMacro.expandAll((AbstractBuild) run, listener, commitSha1));
-                } else {
-                    return Arrays.asList(TokenMacro.expandAll(run, workspace, listener, commitSha1));
-                }
-            } catch (IOException e) {
-                logger.println("Unable to expand commit SHA value");
-                e.printStackTrace(logger);
-                return Arrays.asList();
-            } catch (InterruptedException e) {
-                logger.println("Unable to expand commit SHA value");
-                e.printStackTrace(logger);
-                return Arrays.asList();
-            } catch (MacroEvaluationException e) {
-                logger.println("Unable to expand commit SHA value");
-                e.printStackTrace(logger);
-                return Arrays.asList();
-            }
-        }
-
-        // Use a set to remove duplicates
-        Collection<String> sha1s = new HashSet<String>();
-        // MultiSCM may add multiple BuildData actions for each SCM, but we are covered in any case
-        for (BuildData buildData : run.getActions(BuildData.class)) {
-            // get the sha1 of the commit that was built
-            Revision lastBuiltRevision = buildData.getLastBuiltRevision();
-            if (lastBuiltRevision == null) {
-                continue;
-            }
-            String lastBuiltSha1 = lastBuiltRevision.getSha1String();
-
-            // Should never be null, but may be blank
-            if (!lastBuiltSha1.isEmpty()) {
-                sha1s.add(lastBuiltSha1);
-            }
-
-            // This might be different than the lastBuiltSha1 if using "Merge before run"
-            String markedSha1 = buildData.lastBuild.getMarked().getSha1String();
-
-            // Should never be null, but may be blank
-            if (!markedSha1.isEmpty()) {
-                sha1s.add(markedSha1);
-            }
-        }
-        return sha1s;
     }
 
     /**
@@ -725,14 +661,12 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
      *
      * @param logger     the logger to use
      * @param run        the run to notify Dynatrace of
-     * @param commitSha1 the SHA1 of the run commit
      * @param listener   the run listener for logging
      * @param state      the state of the build as defined by the Dynatrace API.
      */
     protected NotificationResult notifyDynatrace(
             final PrintStream logger,
             final Run<?, ?> run,
-            final String commitSha1,
             final TaskListener listener,
             final DynatraceBuildState state) throws Exception {
         HttpEntity dynatraceBuildNotificationEntity
@@ -742,7 +676,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
 
         logger.println("Notifying Dynatrace at \"" + dynatraceURL + "\"");
 
-        HttpPost req = createRequest(dynatraceBuildNotificationEntity, run.getParent(), commitSha1, dynatraceURL);
+        HttpPost req = createRequest(dynatraceBuildNotificationEntity, run.getParent(), dynatraceURL);
         HttpClient client = getHttpClient(logger, run, dynatraceURL);
         try {
             HttpResponse res = client.execute(req);
@@ -830,21 +764,17 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
      *
      * @param dynatraceBuildNotificationEntity a entity containing the parameters
      *                                     for Dynatrace
-     * @param commitSha1                   the SHA1 of the commit that was built
      * @param url
      * @return the HTTP POST request to the Dynatrace build API
      */
     protected HttpPost createRequest(
             final HttpEntity dynatraceBuildNotificationEntity,
             final Item project,
-            final String commitSha1,
             final String url) throws AuthenticationException {
-
-        HttpPost req = new HttpPost(url);
+        HttpPost req = new HttpPost(url + "/api/v1/events");
 
         if (credentialsId != null) {
-            req.addHeader("Authorization", "Api-Token " +
-                            credentialsId);
+            req.addHeader("Authorization", "ApiToken " + credentialsId);
         }
 
         req.addHeader("Content-type", "application/json");
@@ -888,10 +818,14 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             TaskListener listener) throws UnsupportedEncodingException {
 
         JSONObject json = new JSONObject();
-
+        json.put("Authorization", "Api-Token "+credentialsId);
         json.put("eventType", "CUSTOM_DEPLOYMENT");
         json.put("deploymentName", state.name() + " - " + abbreviate(run.getFullDisplayName(), MAX_FIELD_LENGTH) + " " + abbreviate(getBuildKey(run, listener), MAX_FIELD_LENGTH));
         JSONObject props = new JSONObject();
+        List<String> entityIds = Arrays.asList(entityId);
+        JSONObject attachRules = new JSONObject();
+        attachRules.put("entityIds", entityIds);
+        json.put("attachRules", attachRules);
         props.put("description", abbreviate(getBuildDescription(run, state), MAX_FIELD_LENGTH));
         json.put("customProperties", props);
         json.put("ciBackLink", abbreviate(DisplayURLProvider.get().getRunURL(run), MAX_URL_FIELD_LENGTH));

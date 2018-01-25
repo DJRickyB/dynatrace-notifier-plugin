@@ -285,11 +285,9 @@ public class DynatraceNotifierTest {
         when(build.getResult()).thenReturn(result);
         Launcher launcher = mock(Launcher.class);
         sn = spy(sn);
-        doReturn(hashes).when(sn).lookupCommitSha1s(eq(build), eq((FilePath) null), eq(buildListener));
         doReturn(notificationResult).when(sn).notifyDynatrace(
                 any(PrintStream.class),
                 any(AbstractBuild.class),
-                eq(sha1),
                 eq(buildListener),
                 any(DynatraceBuildState.class)
         );
@@ -309,7 +307,7 @@ public class DynatraceNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Notified Dynatrace for commit with id")));
+        assertThat(messageCaptor.getValue(), is(containsString("Notified Dynatrace")));
     }
 
     @Test
@@ -328,7 +326,7 @@ public class DynatraceNotifierTest {
         verify(logger, atLeastOnce()).println(messageCaptor.capture());
         List<String> values = messageCaptor.getAllValues();
         assertThat(values.get(0), is(containsString("UNSTABLE reported to Dynatrace as SUCCESSFUL")));
-        assertThat(values.get(1), is(containsString("Notified Dynatrace for commit with id")));
+        assertThat(values.get(1), is(containsString("Notified Dynatrace")));
     }
 
     @Test
@@ -361,7 +359,7 @@ public class DynatraceNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Dynatrace for commit")));
+        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Dynatrace")));
     }
 
     @Test
@@ -380,29 +378,29 @@ public class DynatraceNotifierTest {
         assertThat(messageCaptor.getValue(), is(containsString("NOT BUILT")));
     }
 
-    @Test
-    public void test_perform_build_step_empty_hash() throws Exception {
-        //given
-        PrintStream logger = mock(PrintStream.class);
-        when(buildListener.getLogger()).thenReturn(logger);
-        when(build.getResult()).thenReturn(Result.SUCCESS);
-        sn = spy(sn);
-        doReturn(new ArrayList<String>()).when(sn).lookupCommitSha1s(eq(build), eq((FilePath) null), eq(buildListener));
-
-        //when
-        boolean perform = sn.perform(build, mock(Launcher.class), buildListener);
-
-        //then
-        assertThat(perform, is(true));
-        verify(sn, never()).notifyDynatrace(
-                any(PrintStream.class),
-                any(AbstractBuild.class),
-                anyString(),
-                eq(buildListener),
-                any(DynatraceBuildState.class)
-        );
-        verify(logger).println("found no commit info");
-    }
+//    @Test
+//    public void test_perform_build_step_empty_hash() throws Exception {
+//        //given
+//        PrintStream logger = mock(PrintStream.class);
+//        when(buildListener.getLogger()).thenReturn(logger);
+//        when(build.getResult()).thenReturn(Result.SUCCESS);
+//        sn = spy(sn);
+//        doReturn(new ArrayList<String>()).when(sn).lookupCommitSha1s(eq(build), eq((FilePath) null), eq(buildListener));
+//
+//        //when
+//        boolean perform = sn.perform(build, mock(Launcher.class), buildListener);
+//
+//        //then
+//        assertThat(perform, is(true));
+//        verify(sn, never()).notifyDynatrace(
+//                any(PrintStream.class),
+//                any(AbstractBuild.class),
+//                anyString(),
+//                eq(buildListener),
+//                any(DynatraceBuildState.class)
+//        );
+//        verify(logger).println("found no commit info");
+//    }
 
     @Test
     public void test_perform_simple_build_step_success() throws Exception {
@@ -417,7 +415,7 @@ public class DynatraceNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Notified Dynatrace for commit with id")));
+        assertThat(messageCaptor.getValue(), is(containsString("Notified Dynatrace")));
     }
 
 
@@ -434,7 +432,7 @@ public class DynatraceNotifierTest {
         //then
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger).println(messageCaptor.capture());
-        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Dynatrace for commit")));
+        assertThat(messageCaptor.getValue(), is(containsString("Failed to notify Dynatrace")));
     }
 
     @Test
@@ -453,90 +451,29 @@ public class DynatraceNotifierTest {
         assertThat(messageCaptor.getValue(), is(containsString("NOT BUILT")));
     }
 
-    @Test
-    public void test_perform_simple_build_step_empty_hash() throws Exception {
-        //given
-        PrintStream logger = mock(PrintStream.class);
-        when(buildListener.getLogger()).thenReturn(logger);
-        when(build.getResult()).thenReturn(Result.SUCCESS);
-        sn = spy(sn);
-        doReturn(new ArrayList<String>()).when(sn).lookupCommitSha1s(eq(build), eq((FilePath) null), eq(buildListener));
+//    @Test
+//    public void test_perform_simple_build_step_empty_hash() throws Exception {
+//        //given
+//        PrintStream logger = mock(PrintStream.class);
+//        when(buildListener.getLogger()).thenReturn(logger);
+//        when(build.getResult()).thenReturn(Result.SUCCESS);
+//        sn = spy(sn);
+//        doReturn(new ArrayList<String>()).when(sn).lookupCommitSha1s(eq(build), eq((FilePath) null), eq(buildListener));
+//
+//        //when
+//        sn.perform(build, workspace, mock(Launcher.class), buildListener);
+//
+//        //then
+//        verify(sn, never()).notifyDynatrace(
+//                any(PrintStream.class),
+//                any(AbstractBuild.class),
+//                anyString(),
+//                eq(buildListener),
+//                any(DynatraceBuildState.class)
+//        );
+//        verify(logger).println("found no commit info");
+//    }
 
-        //when
-        sn.perform(build, workspace, mock(Launcher.class), buildListener);
-
-        //then
-        verify(sn, never()).notifyDynatrace(
-                any(PrintStream.class),
-                any(AbstractBuild.class),
-                anyString(),
-                eq(buildListener),
-                any(DynatraceBuildState.class)
-        );
-        verify(logger).println("found no commit info");
-    }
-
-    @Test
-    public void lookupCommitSha1s() throws InterruptedException, MacroEvaluationException, IOException {
-        PowerMockito.mockStatic(TokenMacro.class);
-        PowerMockito.when(TokenMacro.expandAll(build, buildListener, sha1)).thenReturn(sha1);
-        sn = new DynatraceNotifier(
-                "https://localhost",
-                "scot",
-                true,
-                sha1,
-                true,
-                null,
-                false,
-                false,
-                false);
-
-        Collection<String> hashes = sn.lookupCommitSha1s(build, null, buildListener);
-
-        assertThat(hashes.size(), is(1));
-        assertThat(hashes.iterator().next(), is(sha1));
-    }
-
-
-    public void lookupCommitSha1s_Exception(Exception e) throws InterruptedException, MacroEvaluationException, IOException {
-        //given
-        PrintStream logger = mock(PrintStream.class);
-        when(buildListener.getLogger()).thenReturn(logger);
-        PowerMockito.mockStatic(TokenMacro.class);
-        PowerMockito.when(TokenMacro.expandAll(build, buildListener, sha1)).thenThrow(e);
-        sn = new DynatraceNotifier(
-                "http://localhost",
-                "scot",
-                true,
-                sha1,
-                true,
-                null,
-                false,
-                false,
-                false);
-
-        //when
-        Collection<String> hashes = sn.lookupCommitSha1s(build, null, buildListener);
-
-        //then
-        assertThat(hashes.isEmpty(), is(true));
-        verify(logger).println("Unable to expand commit SHA value");
-    }
-
-    @Test
-    public void test_lookupCommitSha1s_IOException() throws InterruptedException, MacroEvaluationException, IOException {
-        lookupCommitSha1s_Exception(new IOException("BOOM"));
-    }
-
-    @Test
-    public void test_lookupCommitSha1s_InterruptedException() throws InterruptedException, MacroEvaluationException, IOException {
-        lookupCommitSha1s_Exception(new InterruptedException("BOOM"));
-    }
-
-    @Test
-    public void test_lookupCommitSha1s_MacroEvaluationException() throws InterruptedException, MacroEvaluationException, IOException {
-        lookupCommitSha1s_Exception(new MacroEvaluationException("BOOM"));
-    }
 
     @Test
     public void test_getBuildDescription() throws InterruptedException, MacroEvaluationException, IOException {
@@ -578,7 +515,7 @@ public class DynatraceNotifierTest {
         when(CredentialsMatchers.firstOrNull(anyCollection(), any(CredentialsMatcher.class))).thenReturn(credential);
 
         //when
-        HttpPost request = sn.createRequest(mock(HttpEntity.class), mock(Item.class), sha1, "http://localhost");
+        HttpPost request = sn.createRequest(mock(HttpEntity.class), mock(Item.class), "http://localhost");
 
         //then
         assertThat(request, is(not(nullValue())));
@@ -729,7 +666,7 @@ public class DynatraceNotifierTest {
         when(buildListener.getLogger()).thenReturn(logger);
         doReturn("someKey1").when(sn).getBuildKey(eq(build), eq(buildListener));
         HttpPost httpPost = mock(HttpPost.class);
-        doReturn(httpPost).when(sn).createRequest(any(HttpEntity.class), any(Item.class), anyString(), anyString());
+        doReturn(httpPost).when(sn).createRequest(any(HttpEntity.class), any(Item.class), anyString());
         CloseableHttpResponse resp = mock(CloseableHttpResponse.class);
         StatusLine sl = mock(StatusLine.class);
         when(sl.getStatusCode()).thenReturn(statusCode);
@@ -737,7 +674,7 @@ public class DynatraceNotifierTest {
         when(resp.getEntity()).thenReturn(new StringEntity(""));
         when(client.execute(eq(httpPost))).thenReturn(resp);
         doReturn(client).when(sn).getHttpClient(any(PrintStream.class), any(AbstractBuild.class), anyString());
-        return sn.notifyDynatrace(logger, build, sha1, buildListener, DynatraceBuildState.FAILED);
+        return sn.notifyDynatrace(logger, build, buildListener, DynatraceBuildState.FAILED);
     }
 
     @Test
