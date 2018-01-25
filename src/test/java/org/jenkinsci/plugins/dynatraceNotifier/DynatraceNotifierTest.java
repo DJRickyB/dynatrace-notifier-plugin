@@ -70,12 +70,13 @@ public class DynatraceNotifierTest {
     private Hudson jenkins;
 
     public DynatraceNotifier buildDynatraceNotifier(String dynatraceBaseUrl) {
-        return buildDynatraceNotifier(dynatraceBaseUrl, false, false);
+        return buildDynatraceNotifier(dynatraceBaseUrl, false, false, false);
     }
 
     public DynatraceNotifier buildDynatraceNotifier(String dynatraceBaseUrl,
                                             boolean disableInprogressNotification,
-                                            boolean considerUnstableAsSuccess) {
+                                            boolean considerUnstableAsSuccess,
+                                            boolean onlySendSuccessful) {
         return new DynatraceNotifier(
                 dynatraceBaseUrl,
                 "scot",
@@ -85,7 +86,8 @@ public class DynatraceNotifierTest {
                 "test-project",
                 true,
                 disableInprogressNotification,
-                considerUnstableAsSuccess);
+                considerUnstableAsSuccess,
+                onlySendSuccessful);
     }
 
     DynatraceNotifier sn;
@@ -235,6 +237,7 @@ public class DynatraceNotifierTest {
                 null,
                 false,
                 false,
+                false,
                 false));
 
         doReturn(new ArrayList<Credentials>()).when(sn).lookupCredentials(
@@ -313,7 +316,7 @@ public class DynatraceNotifierTest {
     @Test
     public void test_perform_build_step_success_for_unstable_build() throws Exception {
         //given
-        sn = buildDynatraceNotifier("http://localhost", false, true);
+        sn = buildDynatraceNotifier("http://localhost", false, true, false);
         ArrayList<String> hashes = new ArrayList<String>();
         hashes.add(sha1);
         PrintStream logger = mock(PrintStream.class);
@@ -332,7 +335,7 @@ public class DynatraceNotifierTest {
     @Test
     public void test_perform_build_step_aborted_without_notifying_dynatrace() throws Exception {
         //given
-        sn = buildDynatraceNotifier("http://localhost", true, true);
+        sn = buildDynatraceNotifier("http://localhost", true, true, false);
         ArrayList<String> hashes = new ArrayList<String>();
         hashes.add(sha1);
         PrintStream logger = mock(PrintStream.class);
@@ -540,6 +543,7 @@ public class DynatraceNotifierTest {
                 key,
                 true,
                 false,
+                false,
                 false);
 
         String buildKey = sn.getBuildKey(build, buildListener);
@@ -567,6 +571,7 @@ public class DynatraceNotifierTest {
                 key,
                 true,
                 false,
+                false,
                 false);
 
         String buildKey = sn.getBuildKey(run, buildListener);
@@ -590,6 +595,7 @@ public class DynatraceNotifierTest {
                 true,
                 key,
                 true,
+                false,
                 false,
                 false);
 
@@ -619,6 +625,7 @@ public class DynatraceNotifierTest {
                 true,
                 key,
                 true,
+                false,
                 false,
                 false);
 
@@ -679,7 +686,7 @@ public class DynatraceNotifierTest {
 
     @Test
     public void notifyDynatrace_success() throws Exception {
-        NotificationResult notificationResult = notifyDynatrace(204);
+        NotificationResult notificationResult = notifyDynatrace(200);
         assertThat(notificationResult.indicatesSuccess, is(true));
     }
 

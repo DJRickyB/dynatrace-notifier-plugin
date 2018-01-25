@@ -27,8 +27,6 @@ import hudson.FilePath;
 import hudson.Launcher;
 import hudson.ProxyConfiguration;
 import hudson.model.*;
-import hudson.plugins.git.Revision;
-import hudson.plugins.git.util.BuildData;
 import hudson.security.ACL;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -39,7 +37,6 @@ import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import jenkins.model.JenkinsLocationConfiguration;
 import jenkins.tasks.SimpleBuildStep;
-import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.acegisecurity.Authentication;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -152,6 +149,11 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
      */
     private final boolean considerUnstableAsSuccess;
 
+    /**
+     * whether to only report successful builds to Dynatrace
+     */
+    private final boolean onlyReportSuccess;
+
     private JenkinsLocationConfiguration globalConfig = new JenkinsLocationConfiguration();
 
 // public members ----------------------------------------------------------
@@ -171,7 +173,8 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             String projectKey,
             boolean prependParentProjectKey,
             boolean disableInprogressNotification,
-            boolean considerUnstableAsSuccess
+            boolean considerUnstableAsSuccess,
+            boolean onlyReportSuccess
     ) {
 
 
@@ -186,6 +189,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         this.prependParentProjectKey = prependParentProjectKey;
         this.disableInprogressNotification = disableInprogressNotification;
         this.considerUnstableAsSuccess = considerUnstableAsSuccess;
+        this.onlyReportSuccess = onlyReportSuccess;
     }
 
     public boolean isDisableInprogressNotification() {
@@ -262,6 +266,8 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             state = DynatraceBuildState.INPROGRESS;
         } else if (buildResult == Result.SUCCESS) {
             state = DynatraceBuildState.SUCCESSFUL;
+        } else if (buildResult != Result.SUCCESS && onlyReportSuccess) {
+            return true;
         } else if (buildResult == Result.UNSTABLE && considerUnstableAsSuccess) {
             logger.println("UNSTABLE reported to Dynatrace as SUCCESSFUL");
             state = DynatraceBuildState.SUCCESSFUL;
@@ -666,9 +672,12 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             final Run<?, ?> run,
             final TaskListener listener,
             final DynatraceBuildState state) throws Exception {
-        HttpEntity dynatraceBuildNotificationEntity
-                = newDynatraceBuildNotificationEntity(run, state, listener);
-
+        HttpEntity dynatraceBuildNotificationEntity;
+        if (state.name().equals("SUCCESSFUL")) {
+            dynatraceBuildNotificationEntity = newDynatraceDeployment(run, state, listener);
+        } else {
+            dynatraceBuildNotificationEntity = newDynatraceAnnotation(run, state, listener);
+        }
         String dynatraceURL = expandDynatraceURL(run, listener);
 
         logger.println("Notifying Dynatrace at \"" + dynatraceURL + "\"");
@@ -677,7 +686,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         HttpClient client = getHttpClient(logger, run, dynatraceURL);
         try {
             HttpResponse res = client.execute(req);
-            if (res.getStatusLine().getStatusCode() != 204) {
+            if (res.getStatusLine().getStatusCode() != 200) {
                 return NotificationResult.newFailure(
                         EntityUtils.toString(res.getEntity()));
             } else {
@@ -809,7 +818,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
      * @param run the run to notify Dynatrace of
      * @return HTTP entity body for POST to Dynatrace build API
      */
-    private HttpEntity newDynatraceBuildNotificationEntity(
+    private HttpEntity newDynatraceDeployment(
             final Run<?, ?> run,
             final DynatraceBuildState state,
             TaskListener listener) throws UnsupportedEncodingException {
@@ -826,6 +835,35 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         props.put("description", abbreviate(getBuildDescription(run, state), MAX_FIELD_LENGTH));
         json.put("customProperties", props);
         json.put("ciBackLink", abbreviate(DisplayURLProvider.get().getRunURL(run), MAX_URL_FIELD_LENGTH));
+        json.put("source", "jenkins");
+
+        return new StringEntity(json.toString(), "UTF-8");
+    }
+
+    /**
+     * Returns the HTTP POST entity body with the JSON representation of the
+     * run result to be sent to the Dynatrace build API.
+     *
+     * @param run the run to notify Dynatrace of
+     * @return HTTP entity body for POST to Dynatrace build API
+     */
+    private HttpEntity newDynatraceAnnotation(
+            final Run<?, ?> run,
+            final DynatraceBuildState state,
+            TaskListener listener) throws UnsupportedEncodingException {
+
+        JSONObject json = new JSONObject();
+        json.put("eventType", "CUSTOM_ANNOTATION");
+        json.put("annotationType", state.name() + " Jenkins Job");
+        json.put("annotationDescription", state.name() + " - " + abbreviate(run.getFullDisplayName(), MAX_FIELD_LENGTH) + " " +abbreviate(getBuildKey(run, listener), MAX_FIELD_LENGTH));
+        JSONObject props = new JSONObject();
+        List<String> entityIds = Arrays.asList(entityId);
+        JSONObject attachRules = new JSONObject();
+        attachRules.put("entityIds", entityIds);
+        json.put("attachRules", attachRules);
+        props.put("description", abbreviate(getBuildDescription(run, state), MAX_FIELD_LENGTH));
+        props.put("ciBackLink", abbreviate(DisplayURLProvider.get().getRunURL(run), MAX_URL_FIELD_LENGTH));
+        json.put("customProperties", props);
         json.put("source", "jenkins");
 
         return new StringEntity(json.toString(), "UTF-8");

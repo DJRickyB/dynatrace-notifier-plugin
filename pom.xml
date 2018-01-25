@@ -22,7 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <artifactId>dynatraceNotifier</artifactId>
-    <version>1.14-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>Dynatrace Notifier</name>
     <description>
         Jenkins plugin to notify  Dynatrace (Dynatrace) git repository servers of

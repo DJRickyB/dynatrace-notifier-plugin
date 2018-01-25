@@ -33,5 +33,8 @@
                help="${rootURL}/plugin/dynatraceNotifier/help-globalConfig-considerUnstableAsSuccess.html">
           <f:checkbox default="false"/>
       </f:entry>
+          <f:entry title="Only Report SUCCESS builds to Dynatrace" field="onlyReportSuccess">
+            <f:checkbox/>
+          </f:entry>
   </f:section>
 </j:jelly>
