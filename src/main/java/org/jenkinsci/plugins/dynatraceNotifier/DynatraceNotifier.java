@@ -635,10 +635,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             dynatraceRootUrl = formData.getString("dynatraceRootUrl");
             ignoreUnverifiedSsl = formData.getBoolean("ignoreUnverifiedSsl");
             includeBuildNumberInKey = formData.getBoolean("includeBuildNumberInKey");
-
-            if (formData.has("credentialsId") && StringUtils.isNotBlank(formData.getString("credentialsId"))) {
-                credentialsId = formData.getString("credentialsId");
-            }
+            credentialsId = formData.getString("credentialsId");
             if (formData.has("projectKey")) {
                 projectKey = formData.getString("projectKey");
             }
@@ -774,7 +771,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         HttpPost req = new HttpPost(url + "/api/v1/events");
 
         if (credentialsId != null) {
-            req.addHeader("Authorization", "ApiToken " + credentialsId);
+            req.addHeader("Authorization", "Api-Token " + credentialsId);
         }
 
         req.addHeader("Content-type", "application/json");
@@ -818,9 +815,9 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
             TaskListener listener) throws UnsupportedEncodingException {
 
         JSONObject json = new JSONObject();
-        json.put("Authorization", "Api-Token "+credentialsId);
         json.put("eventType", "CUSTOM_DEPLOYMENT");
-        json.put("deploymentName", state.name() + " - " + abbreviate(run.getFullDisplayName(), MAX_FIELD_LENGTH) + " " + abbreviate(getBuildKey(run, listener), MAX_FIELD_LENGTH));
+        json.put("deploymentName", state.name() + " - " + abbreviate(run.getFullDisplayName(), MAX_FIELD_LENGTH));
+        json.put("deploymentVersion", abbreviate(getBuildKey(run, listener), MAX_FIELD_LENGTH));
         JSONObject props = new JSONObject();
         List<String> entityIds = Arrays.asList(entityId);
         JSONObject attachRules = new JSONObject();
@@ -829,6 +826,7 @@ public class DynatraceNotifier extends Notifier implements SimpleBuildStep {
         props.put("description", abbreviate(getBuildDescription(run, state), MAX_FIELD_LENGTH));
         json.put("customProperties", props);
         json.put("ciBackLink", abbreviate(DisplayURLProvider.get().getRunURL(run), MAX_URL_FIELD_LENGTH));
+        json.put("source", "jenkins");
 
         return new StringEntity(json.toString(), "UTF-8");
     }
